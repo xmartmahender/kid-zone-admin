@@ -17,6 +17,7 @@ export type Story = {
   programmingLanguage?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  isTemporary?: boolean;
 }
 
 export function StoryManagement() {
@@ -32,6 +33,7 @@ export function StoryManagement() {
   const [isCodeStory, setIsCodeStory] = useState(false);
   const [codeSnippet, setCodeSnippet] = useState("");
   const [programmingLanguage, setProgrammingLanguage] = useState("javascript");
+  const [isTemporary, setIsTemporary] = useState(false);
 
   useEffect(() => {
     loadStories();
@@ -62,14 +64,10 @@ export function StoryManagement() {
       
       if (uploadMethod === "file" && coverFile) {
         try {
-          // Get a reference to your storage location with a simpler name
           const fileName = coverFile.name.replace(/[^a-zA-Z0-9.]/g, "_");
           const storageRef = ref(storage, `covers/${fileName}`);
           
-          // Upload the file
           await uploadBytes(storageRef, coverFile);
-          
-          // Get the download URL - this is critical
           coverUrl = await getDownloadURL(storageRef);
           
           console.log("Successfully uploaded image, URL:", coverUrl);
@@ -79,34 +77,29 @@ export function StoryManagement() {
           coverUrl = "https://placehold.co/400x300/png?text=Story";
         }
       } else if (uploadMethod === "url" && coverUrlInput) {
-        // Just use the URL directly
         coverUrl = coverUrlInput;
       } else if (editingId) {
-        // Keep existing cover if editing
         const existingStory = stories.find(s => s.id === editingId);
         coverUrl = existingStory?.coverUrl || "https://placehold.co/400x300/png?text=Story";
       } else {
-        // Default placeholder
         coverUrl = "https://placehold.co/400x300/png?text=Story";
       }
 
-      // Prepare the story data based on type
       const storyData: Partial<Story> = {
         title,
         link,
         ageGroup,
         coverUrl,
         isCodeStory,
+        isTemporary,
         updatedAt: Timestamp.now()
       };
 
-      // Add code-specific fields if it's a code story
       if (isCodeStory) {
         storyData.codeSnippet = codeSnippet;
         storyData.programmingLanguage = programmingLanguage;
       }
 
-      // Save to Firestore
       if (editingId) {
         const storyRef = doc(db, "stories", editingId);
         await updateDoc(storyRef, storyData);
@@ -129,7 +122,6 @@ export function StoryManagement() {
     if (!confirm("Are you sure you want to delete this story?")) return;
 
     try {
-      // Delete cover image from storage if it's our Firebase URL
       if (coverUrl && coverUrl.includes("firebasestorage")) {
         try {
           const imageRef = ref(storage, coverUrl);
@@ -139,7 +131,6 @@ export function StoryManagement() {
         }
       }
       
-      // Delete story document
       await deleteDoc(doc(db, "stories", id));
       loadStories();
     } catch (error) {
@@ -153,13 +144,13 @@ export function StoryManagement() {
     setLink(story.link);
     setAgeGroup(story.ageGroup || "0-3");
     setIsCodeStory(story.isCodeStory || false);
+    setIsTemporary(story.isTemporary || false);
     
     if (story.isCodeStory) {
       setCodeSnippet(story.codeSnippet || "");
       setProgrammingLanguage(story.programmingLanguage || "javascript");
     }
     
-    // Determine if the existing cover is a URL or was uploaded
     if (story.coverUrl && !story.coverUrl.includes("firebasestorage") && 
         !story.coverUrl.includes("placeholder")) {
       setCoverUrlInput(story.coverUrl);
@@ -180,6 +171,7 @@ export function StoryManagement() {
     setIsCodeStory(false);
     setCodeSnippet("");
     setProgrammingLanguage("javascript");
+    setIsTemporary(false);
   };
 
   return (
@@ -187,8 +179,8 @@ export function StoryManagement() {
       <div className="bg-white p-4 shadow rounded mb-6">
         <h2 className="text-xl font-semibold mb-4">Stories</h2>
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="flex items-center mb-2">
+          <div className="mb-4 space-y-2">
+            <label className="flex items-center">
               <input
                 type="checkbox"
                 checked={isCodeStory}
@@ -196,6 +188,15 @@ export function StoryManagement() {
                 className="mr-2"
               />
               <span>This is a code story/tutorial</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={isTemporary}
+                onChange={(e) => setIsTemporary(e.target.checked)}
+                className="mr-2"
+              />
+              <span>This is a temporary story</span>
             </label>
           </div>
 
@@ -348,7 +349,7 @@ export function StoryManagement() {
             <p>Loading stories...</p>
           ) : (
             stories.map((story) => (
-              <div key={story.id} className="border rounded overflow-hidden shadow-sm">
+              <div key={story.id} className={`border rounded overflow-hidden shadow-sm ${story.isTemporary ? 'border-orange-500' : ''}`}>
                 <div className="h-40 overflow-hidden">
                   <img 
                     src={story.coverUrl || "https://via.placeholder.com/400x300?text=No+Cover"} 
@@ -369,9 +370,16 @@ export function StoryManagement() {
                     >
                       {story.title}
                     </a>
-                    <span className="text-sm text-gray-600 block">
-                      Age: {story.ageGroup || "Not specified"}
-                    </span>
+                    <div className="flex gap-2 mt-1">
+                      <span className="text-sm text-gray-600">
+                        Age: {story.ageGroup || "Not specified"}
+                      </span>
+                      {story.isTemporary && (
+                        <span className="text-sm text-orange-600 font-medium">
+                          Temporary
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
