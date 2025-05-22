@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { 
   collection, addDoc, updateDoc, deleteDoc, getDocs, 
-  doc, query, orderBy, Timestamp 
+  doc, query, orderBy, Timestamp, where 
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "../lib/firebase";
@@ -35,10 +35,40 @@ export function StoryManagement() {
   const [codeSnippet, setCodeSnippet] = useState("");
   const [programmingLanguage, setProgrammingLanguage] = useState("javascript");
   const [isTemporary, setIsTemporary] = useState(false);
-  const [popTime, setPopTime] = useState<number>(24); // Default 24 hours
+  const [popTime, setPopTime] = useState<number>(24);
 
   useEffect(() => {
     loadStories();
+
+    // Check for expired temporary stories every minute
+    const interval = setInterval(async () => {
+      const now = Timestamp.now();
+      const q = query(
+        collection(db, "stories"),
+        where("isTemporary", "==", true)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach(async (doc) => {
+        const story = doc.data();
+        const expirationTime = story.createdAt.toDate().getTime() + (story.popTime * 60 * 60 * 1000);
+        
+        if (now.toDate().getTime() >= expirationTime) {
+          // Delete the story if it has expired
+          await deleteDoc(doc.ref);
+          if (story.coverUrl && story.coverUrl.includes("firebasestorage")) {
+            try {
+              const imageRef = ref(storage, story.coverUrl);
+              await deleteObject(imageRef);
+            } catch (err) {
+              console.error("Error deleting expired story image", err);
+            }
+          }
+        }
+      });
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadStories = async () => {

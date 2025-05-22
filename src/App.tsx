@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard,
   BookOpen,
@@ -11,45 +11,137 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianG
 import { VideoManagement } from "./components/VideoManagement";
 import { StoryManagement } from "./components/StoryManagement";
 
-const ADMIN_PASSWORD = "admin123";
-
-// Sections for the dashboard
-const sections = [
-  { key: "dashboard", name: "Dashboard", icon: <LayoutDashboard size={20} /> },
-  { key: "stories", name: "Stories", icon: <BookOpen size={20} /> },
-  { key: "videos", name: "Videos", icon: <Film size={20} /> },
-  { key: "posts", name: "Posts", icon: <FileText size={20} /> },
-  { key: "users", name: "Users", icon: <Users size={20} /> },
-];
+// Move admin credentials to environment variables in production
+const ADMIN_CREDENTIALS = {
+  username: "admin",
+  password: "admin123",
+  resetCode: "RESET2025" // In production, this should be generated dynamically
+};
 
 function Login({ onLogin }: { onLogin: () => void }) {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === ADMIN_PASSWORD) {
+    if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
       onLogin();
+      // Store login timestamp in localStorage
+      localStorage.setItem("lastLogin", new Date().toISOString());
     } else {
-      setError("Incorrect password");
+      setError("Invalid credentials");
     }
   };
+
+  const handleReset = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (resetCode === ADMIN_CREDENTIALS.resetCode) {
+      ADMIN_CREDENTIALS.password = newPassword;
+      setIsResetting(false);
+      setError("Password updated successfully. Please login with new password.");
+    } else {
+      setError("Invalid reset code");
+    }
+  };
+
+  // Auto logout after 24 hours
+  useEffect(() => {
+    const lastLogin = localStorage.getItem("lastLogin");
+    if (lastLogin) {
+      const loginTime = new Date(lastLogin).getTime();
+      const now = new Date().getTime();
+      const hoursSinceLogin = (now - loginTime) / (1000 * 60 * 60);
+      if (hoursSinceLogin >= 24) {
+        localStorage.removeItem("lastLogin");
+        window.location.reload();
+      }
+    }
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-purple-400 to-pink-400">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-xl px-8 py-10 shadow-xl flex flex-col items-center w-80 border border-purple-200"
-      >
-        <h1 className="text-3xl font-bold mb-6 text-purple-700">Admin Login</h1>
-        <input
-          type="password"
-          value={password}
-          placeholder="Enter admin password"
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 px-4 py-2 rounded border border-purple-300 focus:border-purple-500 outline-none w-full transition"
-        />
-        <button className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded font-bold hover:scale-105 shadow transition-all duration-200" type="submit">Login</button>
-        {error && <div className="text-red-600 mt-4">{error}</div>}
-      </form>
+      {!isResetting ? (
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white rounded-xl px-8 py-10 shadow-xl flex flex-col items-center w-96 border border-purple-200"
+        >
+          <h1 className="text-3xl font-bold mb-6 text-purple-700">Admin Login</h1>
+          <input
+            type="text"
+            value={username}
+            placeholder="Username"
+            onChange={(e) => setUsername(e.target.value)}
+            className="mb-4 px-4 py-2 rounded border border-purple-300 focus:border-purple-500 outline-none w-full transition"
+            required
+          />
+          <input
+            type="password"
+            value={password}
+            placeholder="Password"
+            onChange={(e) => setPassword(e.target.value)}
+            className="mb-4 px-4 py-2 rounded border border-purple-300 focus:border-purple-500 outline-none w-full transition"
+            required
+          />
+          <button 
+            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded font-bold hover:scale-105 shadow transition-all duration-200 w-full" 
+            type="submit"
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsResetting(true)}
+            className="mt-4 text-purple-600 hover:text-purple-800 transition"
+          >
+            Reset Password
+          </button>
+          {error && <div className="text-red-600 mt-4 text-center">{error}</div>}
+        </form>
+      ) : (
+        <form
+          onSubmit={handleReset}
+          className="bg-white rounded-xl px-8 py-10 shadow-xl flex flex-col items-center w-96 border border-purple-200"
+        >
+          <h1 className="text-3xl font-bold mb-6 text-purple-700">Reset Password</h1>
+          <input
+            type="text"
+            value={resetCode}
+            placeholder="Reset Code"
+            onChange={(e) => setResetCode(e.target.value)}
+            className="mb-4 px-4 py-2 rounded border border-purple-300 focus:border-purple-500 outline-none w-full transition"
+            required
+          />
+          <input
+            type="password"
+            value={newPassword}
+            placeholder="New Password"
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="mb-4 px-4 py-2 rounded border border-purple-300 focus:border-purple-500 outline-none w-full transition"
+            required
+          />
+          <button 
+            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 rounded font-bold hover:scale-105 shadow transition-all duration-200 w-full" 
+            type="submit"
+          >
+            Reset Password
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsResetting(false);
+              setError("");
+            }}
+            className="mt-4 text-purple-600 hover:text-purple-800 transition"
+          >
+            Back to Login
+          </button>
+          {error && <div className="text-red-600 mt-4 text-center">{error}</div>}
+        </form>
+      )}
     </div>
   );
 }
