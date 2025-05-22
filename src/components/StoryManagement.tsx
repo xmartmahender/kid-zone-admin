@@ -15,9 +15,10 @@ export type Story = {
   isCodeStory?: boolean;
   codeSnippet?: string;
   programmingLanguage?: string;
+  isTemporary?: boolean;
+  popTime?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-  isTemporary?: boolean;
 }
 
 export function StoryManagement() {
@@ -34,6 +35,7 @@ export function StoryManagement() {
   const [codeSnippet, setCodeSnippet] = useState("");
   const [programmingLanguage, setProgrammingLanguage] = useState("javascript");
   const [isTemporary, setIsTemporary] = useState(false);
+  const [popTime, setPopTime] = useState<number>(24); // Default 24 hours
 
   useEffect(() => {
     loadStories();
@@ -92,6 +94,7 @@ export function StoryManagement() {
         coverUrl,
         isCodeStory,
         isTemporary,
+        popTime: isTemporary ? popTime : undefined,
         updatedAt: Timestamp.now()
       };
 
@@ -145,6 +148,7 @@ export function StoryManagement() {
     setAgeGroup(story.ageGroup || "0-3");
     setIsCodeStory(story.isCodeStory || false);
     setIsTemporary(story.isTemporary || false);
+    setPopTime(story.popTime || 24);
     
     if (story.isCodeStory) {
       setCodeSnippet(story.codeSnippet || "");
@@ -172,6 +176,7 @@ export function StoryManagement() {
     setCodeSnippet("");
     setProgrammingLanguage("javascript");
     setIsTemporary(false);
+    setPopTime(24);
   };
 
   return (
@@ -198,6 +203,19 @@ export function StoryManagement() {
               />
               <span>This is a temporary story</span>
             </label>
+            {isTemporary && (
+              <div className="ml-6">
+                <label className="block text-sm text-gray-600">Pop after (hours):</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="168"
+                  value={popTime}
+                  onChange={(e) => setPopTime(parseInt(e.target.value))}
+                  className="mt-1 w-24 p-1 border rounded"
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -376,7 +394,7 @@ export function StoryManagement() {
                       </span>
                       {story.isTemporary && (
                         <span className="text-sm text-orange-600 font-medium">
-                          Temporary
+                          Temporary ({story.popTime}h)
                         </span>
                       )}
                     </div>
